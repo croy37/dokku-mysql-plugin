@@ -156,7 +156,7 @@ case "$1" in
         HOST="DB_HOST=$IP"
         USER="DB_USER=admin"
         PASS="DB_PASS=$DB_PASSWORD"
-        NAME="DB_NAME=db"
+        NAME="DB_NAME=$3"
         PORT="DB_PORT=3306"
         dokku config:set $APP $HOST $USER $PASS $NAME $PORT
         echo
