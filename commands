@@ -112,6 +112,7 @@ case "$1" in
     dokku mysql:info $APP
     ;;
 
+   #this command requires that mysql-client be installed. it can be installed using apt-get install mysql-client
    mysql:dump)
     check_mysql_container
     check_mysql_tool mysqldump
@@ -125,6 +126,7 @@ case "$1" in
         mkdir "$DOKKU_ROOT/mysql_backup/$APP_DIR"
     fi
 
+    #TODO have the ability to use a non standard port and different user
     mysqldump -P 3306 -h $IP -u admin -p$MYSQLPASSWORD $APP > $DOKKU_ROOT/mysql_backup/$APP_DIR/$TIMESTAMP"_"$APP.sql
 
     # echo to stderr, as stdout will probably be redirected to a file
