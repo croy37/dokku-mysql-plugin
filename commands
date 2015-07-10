@@ -1,6 +1,32 @@
 #!/bin/bash
 set -e;
 
+function get_mysql_id() {
+    ID=$(docker ps | grep mysql/"$APP":latest | awk {'print $1'})
+    echo $ID
+}
+
+function get_mysql_ip() {
+    ID=$(get_mysql_id)
+    IP=$(docker inspect $ID | grep IPAddress | awk '{ print $2 }' | tr -d ',"')
+    echo $IP
+}
+
+function check_mysql_container() {
+    if [[ ! -f "$DOKKU_ROOT/.mysql/pwd_$APP" ]]; then
+        echo "Unknown (or too old) mysql container"
+        exit 1
+    fi
+}
+
+function check_mysql_tool() {
+    local tool_name="$1"
+    if [[ $(whereis $tool_name | awk '{ print NF }') -eq 1 ]]; then
+        echo "'${tool_name}' not found. Is the package 'mysql-client' installed?" 1>&2
+        exit 1
+    fi
+}
+
 # Check if name is specified
 if [[ $1 == mysql:* ]]; then
     if [[ -z $2 ]]; then
@@ -86,6 +112,26 @@ case "$1" in
     dokku mysql:info $APP
     ;;
 
+   mysql:dump)
+    check_mysql_container
+    check_mysql_tool mysqldump
+    MYSQLPASSWORD=$(cat "$DOKKU_ROOT/.mysql/pwd_$APP")
+    IP=$(get_mysql_ip)
+    REPLACE='';
+    APP_DIR=${APP/'_db'/$REPLACE};
+    TIMESTAMP=$(date +"%Y-%m-%d_%H:%M:%S")
+
+    if [ ! -d "$DOKKU_ROOT/mysql_backup/$APP_DIR" ]; then
+        mkdir "$DOKKU_ROOT/mysql_backup/$APP_DIR"
+    fi
+
+    mysqldump -P 3306 -h $IP -u admin -p$MYSQLPASSWORD $APP > $DOKKU_ROOT/mysql_backup/$APP_DIR/$TIMESTAMP"_"$APP.sql
+
+    # echo to stderr, as stdout will probably be redirected to a file
+    echo 1>&2
+    echo "-----> $APP database dumped" 1>&2
+    ;;
+  
   mysql:delete)
     DB_IMAGE=mysql/$APP
     # Stop and remove the container
@@ -177,11 +223,12 @@ case "$1" in
 
   help)
     cat && cat<<EOF
-    mysql:create <app>     Create a MySql container
-    mysql:delete <app>     Delete specified MySql container
-    mysql:info <app>       Display database informations
+    mysql:create <db>     Create a MySql container
+    mysql:delete <db>     Delete specified MySql container
+    mysql:info <db>       Display database informations
     mysql:link <app> <db>  Link an app to a MySql database
-    mysql:logs <app>       Display last logs from MySql container
+    mysql:logs <db>       Display last logs from MySql container
+    mysql:dump <db>       Dump Mysql DB to sql file
 EOF
     ;;
 
