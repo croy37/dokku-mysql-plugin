@@ -28,7 +28,7 @@ function check_mysql_tool() {
 }
 
 # Check if name is specified
-if [[ $1 == mysql:* ]]; then
+if [[ $1 != mysql:list ]]; then
     if [[ -z $2 ]]; then
         echo "You must specify an app name"
         exit 1
@@ -132,6 +132,18 @@ case "$1" in
     echo "-----> $APP database dumped" 1>&2
     ;;
   
+  mysql:list)
+    CONTAINERS=$(ls $DOKKU_ROOT/.mysql/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
+    if [[ -z $CONTAINERS ]]; then
+        echo "There are no mysql containers created."
+    else
+        echo "mysql containers:"
+        for CONTAINER in $CONTAINERS; do
+            echo "  - $CONTAINER"
+        done
+    fi
+    ;;
+
   mysql:delete)
     DB_IMAGE=mysql/$APP
     # Stop and remove the container
