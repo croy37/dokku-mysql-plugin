@@ -2,17 +2,28 @@
 set -e;
 
 function get_mysql_id() {
+    if [ ! -z $1 ]; then
+        APP=$1
+    fi
     ID=$(docker ps | grep mysql/"$APP":latest | awk {'print $1'})
     echo $ID
 }
 
 function get_mysql_ip() {
-    ID=$(get_mysql_id)
+    if [ ! -z $1 ]; then
+        APP=$1
+    fi
+
+    ID=$(get_mysql_id $APP)
     IP=$(docker inspect $ID | grep IPAddress | awk '{ print $2 }' | tr -d ',"')
     echo $IP
 }
 
 function check_mysql_container() {
+    if [ ! -z $1 ]; then
+        APP=$1
+    fi
+
     if [[ ! -f "$DOKKU_ROOT/.mysql/pwd_$APP" ]]; then
         echo "Unknown (or too old) mysql container"
         exit 1
@@ -28,8 +39,8 @@ function check_mysql_tool() {
 }
 
 # Check if name is specified
-if [[ $1 != mysql:list ]]; then
-    if [[ -z $2 ]]; then
+if [[ $1 == mysql:* ]]; then
+    if [[ -z $2 ]] && [[$1 != mysql:list]] && [[$1 != mysql:dump:all]]; then
         echo "You must specify an app name"
         exit 1
     else
@@ -134,6 +145,35 @@ case "$1" in
     echo "-----> $APP database dumped" 1>&2
     ;;
   
+  mysql:dump:all)
+    CONTAINERS=$(ls $DOKKU_ROOT/.mysql/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
+    if [[ -z $CONTAINERS ]]; then
+        echo "There are no mysql containers created."
+    else
+        check_mysql_tool mysqldump
+        for CONTAINER in $CONTAINERS; do
+            #TODO Have these command accept a app name param
+            check_mysql_container $CONTAINER
+            MYSQLPASSWORD=$(cat "$DOKKU_ROOT/.mysql/pwd_$APP")
+            IP=$(get_mysql_ip $CONTAINER)
+            REPLACE='';
+            APP_DIR=${APP/'_db'/$REPLACE};
+            TIMESTAMP=$(date +"%Y-%m-%d_%H:%M:%S")
+
+            if [ ! -d "$DOKKU_ROOT/mysql_backup/$APP_DIR" ]; then
+                mkdir "$DOKKU_ROOT/mysql_backup/$APP_DIR"
+            fi
+
+            #TODO have the ability to use a non standard port and different user
+            mysqldump -P 3306 -h $IP -u admin -p$MYSQLPASSWORD $APP > $DOKKU_ROOT/mysql_backup/$APP_DIR/$TIMESTAMP"_"$APP.sql
+
+            # echo to stderr, as stdout will probably be redirected to a file
+            echo 1>&2
+            echo "-----> $APP database dumped" 1>&2
+        done
+    fi
+    ;;
+
   mysql:list)
     CONTAINERS=$(ls $DOKKU_ROOT/.mysql/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
     if [[ -z $CONTAINERS ]]; then
@@ -243,6 +283,7 @@ case "$1" in
     mysql:link <app> <db>  Link an app to a MySql database
     mysql:logs <db>       Display last logs from MySql container
     mysql:dump <db>       Dump Mysql DB to sql file
+    mysql:dump:all        Dump all dbs into seperate .sql
 EOF
     ;;
 
