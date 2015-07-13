@@ -173,6 +173,25 @@ case "$1" in
         done
     fi
     ;;
+  
+  mysql:import)
+    check_mysql_container
+    check_mysql_tool mysql
+    MYSQLPASSWORD=$(cat "$DOKKU_ROOT/.mysql/pwd_$APP")
+    IP=$(get_mysql_ip)
+    REPLACE='';
+    APP_DIR=${APP/'_db'/$REPLACE};
+
+    if [ ! -d "$DOKKU_ROOT/mysql_backup/$APP_DIR" ]; then
+        echo "There are no backups"
+        exit 1
+    fi
+
+    # TODO add functionallity to select backup from list or select custom sql file
+    LATEST_BACKUP=$(ls $DOKKU_ROOT/mysql_backup/$APP_DIR | sort -V | tail -n 1);
+    mysql -P 3306 -h $IP -u admin -p$MYSQLPASSWORD $APP < "$DOKKU_ROOT/mysql_backup/$APP_DIR/$LATEST_BACKUP"
+    echo "$APP import complete"
+    ;;
 
   mysql:list)
     CONTAINERS=$(ls $DOKKU_ROOT/.mysql/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
@@ -277,13 +296,14 @@ case "$1" in
 
   help)
     cat && cat<<EOF
-    mysql:create <db>     Create a MySql container
-    mysql:delete <db>     Delete specified MySql container
-    mysql:info <db>       Display database informations
-    mysql:link <app> <db>  Link an app to a MySql database
-    mysql:logs <db>       Display last logs from MySql container
-    mysql:dump <db>       Dump Mysql DB to sql file
-    mysql:dump:all        Dump all dbs into seperate .sql
+    mysql:create <db>                    Create a MySql container
+    mysql:delete <db>                    Delete specified MySql container
+    mysql:info <db>                      Display database informations
+    mysql:link <app> <db>                Link an app to a MySql database
+    mysql:logs <db>                      Display last logs from MySql container
+    mysql:dump <db>                      Dump Mysql DB to sql file
+    mysql:dump:all                       Dump all dbs into seperate .sql
+    mysql:import <app>                   Import db form latest sql backup
 EOF
     ;;
 
