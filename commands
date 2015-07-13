@@ -124,7 +124,7 @@ case "$1" in
     ;;
 
    #this command requires that mysql-client be installed. it can be installed using apt-get install mysql-client
-   mysql:dump)
+   mysql:backup)
     check_mysql_container
     check_mysql_tool mysqldump
     MYSQLPASSWORD=$(cat "$DOKKU_ROOT/.mysql/pwd_$APP")
@@ -145,7 +145,7 @@ case "$1" in
     echo "-----> $APP database dumped" 1>&2
     ;;
   
-  mysql:dump:all)
+  mysql:backup:all)
     CONTAINERS=$(ls $DOKKU_ROOT/.mysql/volume* 2> /dev/null | sed -e 's/_/ /' | awk '{print $2}')
     if [[ -z $CONTAINERS ]]; then
         echo "There are no mysql containers created."
@@ -174,7 +174,7 @@ case "$1" in
     fi
     ;;
   
-  mysql:import)
+  mysql:restore)
     check_mysql_container
     check_mysql_tool mysql
     MYSQLPASSWORD=$(cat "$DOKKU_ROOT/.mysql/pwd_$APP")
@@ -301,9 +301,9 @@ case "$1" in
     mysql:info <db>                      Display database informations
     mysql:link <app> <db>                Link an app to a MySql database
     mysql:logs <db>                      Display last logs from MySql container
-    mysql:dump <db>                      Dump Mysql DB to sql file
-    mysql:dump:all                       Dump all dbs into seperate .sql
-    mysql:import <app>                   Import db form latest sql backup
+    mysql:backup <db>                      Dump Mysql DB to sql file
+    mysql:backup:all                       Dump all dbs into seperate .sql
+    mysql:restore <db>                   Import db form latest sql backup
 EOF
     ;;
 
