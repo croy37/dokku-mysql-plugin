@@ -38,6 +38,33 @@ function check_mysql_tool() {
     fi
 }
 
+function db_restore() {
+    echo "Please select the number of backup that you wish to restore"
+    echo -e "[0] - Custom File"
+
+    for I in ${!BACKUPS[*]}; do
+        PRINT_INDEX=$(($I + 1))
+        PRINT_VALUE=${BACKUPS[$I]/"$DOKKU_ROOT/mysql_backup/$APP_DIR/"/$REPLACE}
+        echo -e "[$PRINT_INDEX] - $PRINT_VALUE"
+    done
+
+    printf "Select Number:"
+    read -r SELECTED_BACKUP
+
+    if [[ "$SELECTED_BACKUP" =~ ^[0-9]+$ ]] && [ "$SELECTED_BACKUP" -lt 0 -o "$SELECTED_BACKUP" -gt "$NUMBER_OF_BACKUPS" ]; then
+        echo "Please select a valid option"
+        db_restore
+    fi
+
+    if [[ "$SELECTED_BACKUP" -eq 0 ]]; then
+        echo "Please enter the full path to your sql file"
+        read -e -p "Full File Path: " FILE_PATH
+        SELECTED_FILE=$FILE_PATH
+    else
+        SELECTED_FILE=${BACKUPS[$(($SELECTED_BACKUP - 1))]}
+    fi
+}
+
 # Check if name is specified
 if [[ $1 == mysql:* ]]; then
     if [[ -z $2 ]] && [[$1 != mysql:list]] && [[$1 != mysql:dump:all]]; then
@@ -187,9 +214,13 @@ case "$1" in
         exit 1
     fi
 
-    # TODO add functionallity to select backup from list or select custom sql file
-    LATEST_BACKUP=$(ls $DOKKU_ROOT/mysql_backup/$APP_DIR | sort -V | tail -n 1);
-    mysql -P 3306 -h $IP -u admin -p$MYSQLPASSWORD $APP < "$DOKKU_ROOT/mysql_backup/$APP_DIR/$LATEST_BACKUP"
+    BACKUPS=($DOKKU_ROOT/mysql_backup/$APP_DIR/*.sql)
+    LATEST_BACKUP=${BACKUPS[${#BACKUPS[@]} - 1]};
+    NUMBER_OF_BACKUPS=${#BACKUPS[@]}
+
+    db_restore
+
+    mysql -P 3306 -h $IP -u admin -p$MYSQLPASSWORD $APP < "$SELECTED_FILE"
     echo "$APP import complete"
     ;;
 
